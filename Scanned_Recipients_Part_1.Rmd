@@ -1,0 +1,450 @@
+---
+title: "Fetch Take Home Assignment R Markdown 1"
+author: "Nikhil Roy"
+date: "November 19, 2023"
+output: html_document
+---
+
+## Here, we are just:
+### 1. Reading the file 
+### 2. Seeing what the data looks like and manipulating/changing/adding variables
+### 3. Creating several models (such as polynomials, interactions, linear, etc.)
+### 4. Exploring the data and several models visually - data collecting and learning
+
+
+## IMPORTANT: Here, we are assuming that there is no prior distribution, just to get a visual feel of what the raw data looks like, the other R Markdowns included in this folder will use the 2021 data as the prior and explore new models and use of linear algebra and formulation to identify the best model as well as create predictions and trainig sets. 
+
+## The purpose of this document is to give a high level approach of what the data looks like and how we can visualize, interpret, and conclude what the best model is based on this raw 2021 data (assuming no prior of course). We will incopoerate the prior in the other R Markdowns, but this documenent specifically gives a basic and "easy" approach to the data without going through the complicated math - which is done and manipulated in the R markdowns. 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r,message = FALSE}
+library(tidyverse)
+```
+
+
+```{r,message = FALSE}
+# Read in data and show what it looks 
+scanned_df <- readr::read_csv("data_daily.csv", col_names = TRUE)
+colnames(scanned_df)[1] ="Date"
+scanned_df %>% glimpse()
+```
+
+
+
+```{r}
+#Plotting
+
+scanned_df %>% ggplot(mapping = aes(x = Date)) +
+  geom_point(aes(y = Receipt_Count))
+
+```
+
+```{r}
+#We will now create a new column (or mutate) in order to make the response variable easier to predict and see. Instead of labeling it with long numbers, we will write it in terms of millions. Similarly, we will add another column for the Date to make it a continuous variable instead of an object type in order to create models and predictions when we eventually get to the training tests and machine learning models
+
+scanned_df <- scanned_df %>%
+  mutate(Receipt_Count_Millions = Receipt_Count / 1e6,
+         Day_of_Year = yday(as.Date(Date)))
+
+
+```
+
+
+
+### Plot again, but using the adjusted input and response variables
+```{r,}
+
+
+scanned_df %>% ggplot(mapping = aes(x = Date)) +
+  geom_point(aes(y = Receipt_Count)) +
+  scale_y_continuous(
+    name = "Receipt Count (Millions)",
+    breaks = seq(0, max(scanned_df$Receipt_Count), by = 1e6),
+    labels = scales::comma_format(scale = 1e-6) ) +
+  geom_smooth(aes(y = Receipt_Count), method = "lm", se = FALSE, solid = "dashed", color = "turquoise", linewidth = 2)
+```
+
+### Let's check the correlation (R-Squared value)
+```{r}
+cor(scanned_df$Day_of_Year, scanned_df$Receipt_Count_Millions)
+```
+> Very highly correlated 
+
+
+### Model Making and Selection
+```{r}
+#Now we will create several models to see what it is the best, this chunk will show the 9 models I have created. The chunk below will access the models and dislay the coefficents to visually show what coefficents are signifigant or not for each model. Don't worry, the explanation is rather easy and I will explain it when I show the coefficent plots
+
+#9 models:
+
+mod01 <- lm(Receipt_Count_Millions ~ Day_of_Year, data = scanned_df) #Simple Linear
+
+mod02 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2), data = scanned_df) #Quadratic
+
+mod03 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3), data = scanned_df) #Cubic
+
+mod04 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3) + I(Day_of_Year^4), data = scanned_df) #Quartic
+
+mod05 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3) + I(Day_of_Year^4) + I(Day_of_Year^5), data = scanned_df) #5th degree
+
+mod06 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3) + I(Day_of_Year^4) + I(Day_of_Year^5) + I(Day_of_Year^6), data = scanned_df) #6th degree
+
+mod07 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3) + I(Day_of_Year^4) + I(Day_of_Year^5) + I(Day_of_Year^6) + I(Day_of_Year^7), data = scanned_df) #7th degree
+
+mod08 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3) + I(Day_of_Year^4) + I(Day_of_Year^5) + I(Day_of_Year^6) + I(Day_of_Year^7) + I(Day_of_Year^8), data = scanned_df) #8th degree
+
+mod09 <- lm(Receipt_Count_Millions ~ Day_of_Year + I(Day_of_Year^2) + I(Day_of_Year^3) + I(Day_of_Year^4) + I(Day_of_Year^5) + I(Day_of_Year^6) + I(Day_of_Year^7) + I(Day_of_Year^8) + I(Day_of_Year^9), data = scanned_df) #9th degree
+
+```
+
+
+### Plotting coefficent plots for the 9 models to see the coefficents and their significance
+
+### Get The Summary For Model 1 and 9
+
+##### Model 1:
+```{r}
+summary(mod01)
+
+```
+> Model 1 shows that the Day_of_Year or the transformed Date is significant (with a p-value far below 5%); however, lets look at the most complex model which would be the 9th degree model:
+
+
+##### Model 9:
+```{r}
+summary(mod09)
+```
+> Here, none of the predictors or coefficents are significant - not even the Day_Of_Year which was significant in model... shows that this trend may be linear rather than quadratic or some high complex model. This makes sense because of the scatterplot earlier with the geom_smooth line, which was mainly linear with a high correlation (or R-squared value). 
+
+### Let's check the coefficent plots now:
+```{r}
+
+coefplot::coefplot(mod01, innerCI = 3, outerCI = 3, intercept = FALSE)
+```
+
+> Here, you can see the coefficent for model 1 is significant. The reason is because it's 95% confidence interval does not contain 0. Thus, coefficent plots such as this is an easy way to acess whether a coefficent is significant or not. 
+
+>Earlier, we said all the coefficents for model 1 was significant; however, none of the coefficents are significant in the more complex models (specifically, models 2-9). Let's plot the coefficent plots to illustrate it.
+
+> Models 2,3,4,5:
+
+```{r}
+coefplot::multiplot(mod02, mod03, mod04, mod05, innerCI = 2, outerCI = 2, intercept = FALSE)
+```
+
+> Models 6, 7,8, and 9:
+
+```{r}
+coefplot::multiplot(mod06, mod07, mod08, mod09, innerCI = 2, outerCI = 2, intercept = FALSE)
+```
+
+
+### Conclusions:
+
+> Based on these previous 2 coefficent plots (which I used a the multicoefficent plot method call to store multiple models in 1 singular plot), you can see that the higher order models have less significance, especially when you see the Day_Of_Year linear coefficent becoming less significant as the model degree/complexity increases. Again, we can tell that the coefficent is not significant because the interval contains 0, meaning it is uncertain of the coefficent value - based upon a 95% confidence interval.
+
+> There is great evidence that the linear model (y = Day_of_year) is the best model because the higher order coefficents (meaning  (day_oftime)^2,  (day_oftime)^3, etc. ) are not significant whatsoever - as their confidence interval definitely contains 0. 
+
+
+### We know the linear simple model is the best, but let's do 1 more test to showcase, this. Let's use the AIC and BIC evaluation metrics to visually represent how well the models fit. 
+
+### The AIC and BIC are evaluation metrics to show how well the model fits with the data and how it performs. Ultimately, the main conclusion is: The lower the AIC/BIC value, the better the models fit, so we want to lookm out for the lowest AIC/BIC value!
+
+
+
+```{r}
+models <- list(mod01, mod02, mod03, mod04, mod05, mod06, mod07, mod08, mod09)
+
+# Create a tibble with AIC and BIC for each model
+model_data <- tibble(
+  Model = paste0("mod", 1:9),
+  AIC = sapply(models, function(model) broom::glance(model)$AIC),
+  BIC = sapply(models, function(model) broom::glance(model)$BIC)
+)
+```
+
+
+### AIC
+```{r}
+model_data %>% ggplot(mapping = aes(x = Model, y = AIC, fill = "AIC")) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Model AIC", y = "Value") +
+  scale_fill_manual(values = c("AIC" = "gold")) 
+```
+
+### BIC
+
+```{r}
+model_data %>% ggplot(mapping = aes(x = Model, y = BIC, fill = "BIC")) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Model BIC", y = "Value") +
+  scale_fill_manual(values = c("BIC" = "blue"))
+```
+
+
+> Thus, model 1 is the best model as it has the lowest AIC and BIC value. This is mo surprise as the correlation for the simple linear model ( y~ Day_Of_Year) was significantly high with an R-squared value of around 0.96. Thus, this data provided is linear
+
+
+> Let's visualize this in 1 more way before moving on with using Bayesian inference through the incorperation of a prior
+
+
+#### Define function to extract the performance across the given models
+
+```{r}
+
+extract_metrics <- function(mod, mod_name)
+{
+  broom::glance(mod) %>% mutate(mod_name = mod_name)
+}
+```
+
+
+```{r}
+all_metrics <- purrr::map2_dfr(list(mod01, mod02, mod03, mod04, mod05, mod06, mod07, mod08, mod09),
+                               as.character(1:9),
+                               extract_metrics)
+```
+
+
+#### Plot the performance metrics:
+
+```{r}
+all_metrics %>% 
+  select(mod_name, df, r.squared, AIC, BIC) %>% 
+  pivot_longer(!c("mod_name", "df")) %>% 
+  ggplot(mapping = aes(x = mod_name, y = value)) +
+  geom_point(size = 5) +
+  facet_wrap(~name, scales = "free_y") +
+  theme_bw()
+```
+
+> As we can clearly see, model 1 is the best model as it has the lowest AIC and BIC values; however, when we look at the r - squared value, we see the more complex models have higher r-squared, especially model 9. Once we use the prior and Bayesian inference to perform the metrics and actual "Machine Learning" part of the task, we will see that the more complex models actually OVERFIT the training data. 
+
+
+#### To end things off on the data exploration and before introducing Bayesian inference and the affect of the prior, We will define a prediction or visualization test grid. This grid will allow to visualize behavior (response) with respect to x1. 
+
+
+The `x1 column of the `viz_grid` tibble are created viz the `expand.grid()` function. The `seq()` function is used with the `length.out` argument is used to specify the length of the vector of evenly spaced values *from* a lower bound *to* an upper bound.
+
+Since we want to make precictions for 2022, we will use 730 days (aka 2 years) to see how the predictions and intervals look according the 9 models WITHOUT A PRIOR! We will make 1460 predictions, which is equivalent to 2 predictions every day (every prediction per half day). 
+
+```{r}
+viz_grid <- expand.grid(Day_of_Year = seq(1, 730, length.out = 1460),                                                 KEEP.OUT.ATTRS = FALSE
+                        ) %>% 
+  as.data.frame() %>% tibble::as_tibble()
+
+
+viz_grid %>% glimpse()
+```
+
+
+
+The first argument to the `tidy_predict()` function is a `lm()` model object and the second argument is new or test dataframe of inputs. When working with `lm()` and its `predict()` method, the functions will create the test design matrix consistent with the training design basis. It does so via the model object's formula which is contained within the `lm()` model object. The `lm()` object therefore takes care of the heavy lifting for us!  
+
+```{r}
+tidy_predict <- function(mod, xnew)
+{
+  pred_df <- predict(mod, xnew, interval = "confidence") %>% 
+    as.data.frame() %>% tibble::as_tibble() %>% 
+    dplyr::select(pred = fit, ci_lwr = lwr, ci_upr = upr) %>% 
+    bind_cols(predict(mod, xnew, interval = 'prediction') %>% 
+                as.data.frame() %>% tibble::as_tibble() %>% 
+                dplyr::select(pred_lwr = lwr, pred_upr = upr))
+  
+  xnew %>% bind_cols(pred_df)
+}
+```
+
+
+
+Now, we are going to make predictions with each of the 9 models we fit earlier (mod01 - mod09).
+
+```{r, solution_02b, eval=TRUE}
+
+pred_lm_01 <- tidy_predict(mod01, viz_grid)
+
+pred_lm_02 <- tidy_predict(mod02, viz_grid)
+
+pred_lm_03 <- tidy_predict(mod03, viz_grid)
+
+pred_lm_04 <- tidy_predict(mod04, viz_grid)
+
+pred_lm_05 <- tidy_predict(mod05, viz_grid)
+
+pred_lm_06 <- tidy_predict(mod06, viz_grid)
+
+pred_lm_07 <- tidy_predict(mod07, viz_grid)
+
+pred_lm_08 <- tidy_predict(mod08, viz_grid)
+
+pred_lm_09 <- tidy_predict(mod09, viz_grid)
+```
+
+
+Let's see what this looks like after we compute the function for each of the 9 models:
+
+```{r}
+pred_lm_01 %>% glimpse()
+```
+You can see that we have multiple variables of use after we make the predictions and calculate the confidence and prediction intervals. Remember again, this is with no prior!
+
+
+
+Let's now plot the precition (in orange) and confidence intervals (in grey). The black line is the prediction based on the input we have transformed - Day_of_Year
+
+Model 1:
+
+```{r}
+pred_lm_01 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+Model 2:
+
+```{r}
+pred_lm_02 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+Model 3:
+
+```{r}
+pred_lm_03 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+Model 4:
+
+```{r}
+pred_lm_04 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+
+Model 5:
+
+```{r}
+pred_lm_05 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+
+Model 6:
+
+```{r}
+pred_lm_06 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+
+Model 7:
+
+```{r}
+pred_lm_07 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+
+Model 8:
+
+```{r}
+pred_lm_08 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+
+Model 9:
+
+```{r}
+pred_lm_09 %>% 
+  ggplot(mapping = aes(x = Day_of_Year)) +
+  geom_ribbon(mapping = aes(ymin = pred_lwr, ymax = pred_upr),
+              fill = 'orange') +
+  geom_ribbon(mapping = aes(ymin = ci_lwr, ymax = ci_upr),
+              fill = 'grey') +
+  geom_line(mapping = aes(y = pred),
+            color = 'black') +
+  theme_bw()
+```
+
+> Conclusion:
+
+> Looking across the 9 models we have created, increasing in complexity and degrees of their polynomials/exponents, we can confidently access that model 1, the linear model, is the best model and most useful model for our prediction. Even looking at the previous 9 plots for the prediction and confidence intervals, you can see model 1 has the least variance and the "orange" line is less wider and the "grey" region is more narrower as well as the "black" prediction line gets smaller and more along the "grey" confidence interval as compared to the more complex models.
+
+> Likewise, we assumed no prior. So with the first 365 days, the data looked relatively normal across all 9 models. However, once it ran out of the days of the year we provided from the dataframe in which we read, the higher order models became a complete disaster in predicting the recipent count in millions. This is clearly illustrated in the grey confidence interval region becoming a complete disaster, with a much higher range and a completely different shape - from days 366 to the end. Likewise, the more the days past 365 days, the more out of control those confidence intervals and "grey" area get. The prediction intervals start to disappear as we increase the model complexity. 
+
+> As we examine the predictions from model 1 through model 9, we see the trend (the black line) become more and more "wiggly" and the confidence interval (grey ribbon) growing larger in size. Looking closely at the figures, we also see the prediction interval "shell" (the outer orange ribbon) appears to expand larger relative to the confidence interval. The expanding prediction interval "shell" is due to the model's training set error decreases as the complexity increases. The confidence interval is growing however because there are many different ways to combine the features and still approximate the training data. This concept was previously visualized when we examined the coefficient summaries. The coefficient confidence intervals were very wide for the more complex models.  
+
+
+> However, we assumed that there is no influence on the prior in accessing the Receipt_count across the 365 days. We have transformed the variables into millions and integers from 1-365 to easily interpret and see the data. However, we need to use the prior and bayesian inference to help with our log posterior and accessing the true predictions to help predict and indentify the best model in our selection and accurately access with the training data and test data. Part 2 will look into the influence on the prior and use that to help access the log posterior as we will truly get into the machine learning aspect. 
+
+
+
+
+
+
+
+
+
+
